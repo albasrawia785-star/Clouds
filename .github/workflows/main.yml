@@ -13,27 +13,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. فك ضغط الملف المضغوط (قم بتغيير project.zip إلى اسم ملفك المضغوط)
-      - name: Unzip project
+      # 1. البحث عن أي ملف zip وفك ضغطه
+      - name: Find and Unzip Zip File
         run: |
-          if [ -f "project.zip" ]; then
-            echo "Unzipping project.zip..."
-            unzip -o project.zip -d .
+          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found zip file: $ZIP_FILE. Unzipping..."
+            unzip -o "$ZIP_FILE" -d ./extracted
+            
+            # إذا كانت الملفات داخل مجلد فرعي، نقلها للمجلد الرئيسي
+            if [ -f "./extracted/package.json" ]; then
+              cp -rn ./extracted/* .
+            else
+              SUBDIR=$(find ./extracted -maxdepth 2 -name "package.json" -exec dirname {} \;)
+              if [ -n "$SUBDIR" ]; then
+                cp -rn $SUBDIR/* .
+              fi
+            fi
+          else
+            echo "No zip file found, proceeding with current directory files."
           fi
 
-      # 2. إعداد بيئة Bun (لأن مشروعك يحتوي على bun.lock)
+      # 2. إعداد بيئة Bun
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
-      # 3. تثبيت الحزم وبناء مجلد dist
+      # 3. تثبيت الحزم وبناء المشروع
       - name: Install dependencies & Build
         run: |
           bun install
           bun run build
 
-      # 4. ضغط مجلد dist وتجهيزه للتحميل
+      # 4. رفع مجلد dist جاهزاً للتحميل
       - name: Upload dist folder as Artifact
         uses: actions/upload-artifact@v4
         with:

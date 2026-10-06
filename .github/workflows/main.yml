@@ -13,25 +13,41 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 1. إعداد بيئة Bun
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
-      - name: Install Dependencies
-        run: bun install
-
-      - name: Build Project
-        run: bun run build
-
-      # الدخول إلى داخل مجلد dist وضغط محتوياته المباشرة
-      - name: Zip Dist Contents
+      # 2. تحديد المسار الصحيح الذي يحتوي على package.json والتثبيت والبناء
+      - name: Install & Build Project
         run: |
-          cd dist
-          zip -r ../cloudflare-dist.zip .
-          cd ..
+          # البحث عن مكان package.json
+          TARGET_DIR=$(find . -maxdepth 2 -name "package.json" -exec dirname {} \;)
+          
+          if [ -z "$TARGET_DIR" ]; then
+            echo "Error: package.json not found in repository!"
+            exit 1
+          fi
+          
+          echo "Found package.json in: $TARGET_DIR"
+          cd "$TARGET_DIR"
+          
+          # تثبيت الحزم والبناء
+          bun install
+          bun run build
+          
+          # ضغط محتويات مجلد dist من الداخل مباشرة لتقبله كلاود فلير
+          if [ -d "dist" ]; then
+            cd dist
+            zip -r ../../../cloudflare-dist.zip .
+            echo "Successfully zipped dist directory!"
+          else
+            echo "Error: dist directory was not created!"
+            exit 1
+          fi
 
-      # رفع الملف المضغوط جاهزاً ومباشراً
+      # 3. رفع ملف ZIP الناتج كـ Artifact
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:

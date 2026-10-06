@@ -13,23 +13,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 1. إعداد بيئة Bun
+      # 1. فك ضغط أي ملف ZIP مرفوع في المستودع
+      - name: Unzip any ZIP files
+        run: |
+          ZIP_FILES=$(find . -maxdepth 2 -name "*.zip")
+          for f in $ZIP_FILES; do
+            echo "Unzipping $f..."
+            unzip -o "$f" -d .
+          done
+
+      # 2. إعداد بيئة Bun
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
-      # 2. تحديد المسار الصحيح الذي يحتوي على package.json والتثبيت والبناء
+      # 3. البحث عن package.json وبناء المشروع
       - name: Install & Build Project
         run: |
-          # البحث عن مكان package.json
-          TARGET_DIR=$(find . -maxdepth 2 -name "package.json" -exec dirname {} \;)
+          # البحث العميق عن package.json
+          PACKAGE_PATH=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1)
           
-          if [ -z "$TARGET_DIR" ]; then
-            echo "Error: package.json not found in repository!"
+          if [ -z "$PACKAGE_PATH" ]; then
+            echo "Error: Could not find package.json anywhere in repository!"
             exit 1
           fi
           
+          TARGET_DIR=$(dirname "$PACKAGE_PATH")
           echo "Found package.json in: $TARGET_DIR"
           cd "$TARGET_DIR"
           
@@ -37,17 +47,17 @@ jobs:
           bun install
           bun run build
           
-          # ضغط محتويات مجلد dist من الداخل مباشرة لتقبله كلاود فلير
+          # ضغط محتويات مجلد dist مباشرة من الداخل
           if [ -d "dist" ]; then
             cd dist
-            zip -r ../../../cloudflare-dist.zip .
-            echo "Successfully zipped dist directory!"
+            zip -r "$GITHUB_WORKSPACE/cloudflare-dist.zip" .
+            echo "Successfully created cloudflare-dist.zip!"
           else
-            echo "Error: dist directory was not created!"
+            echo "Error: dist directory was not created after build!"
             exit 1
           fi
 
-      # 3. رفع ملف ZIP الناتج كـ Artifact
+      # 4. رفع الملف المضغوط للتحميل
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:

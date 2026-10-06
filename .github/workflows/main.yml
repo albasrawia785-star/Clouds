@@ -1,0 +1,41 @@
+name: Unzip, Build and Download Dist
+
+on:
+  push:
+    branches:
+      - main # أو master حسب اسم الفرع لديك
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. فك ضغط الملف المضغوط (قم بتغيير project.zip إلى اسم ملفك المضغوط)
+      - name: Unzip project
+        run: |
+          if [ -f "project.zip" ]; then
+            echo "Unzipping project.zip..."
+            unzip -o project.zip -d .
+          fi
+
+      # 2. إعداد بيئة Bun (لأن مشروعك يحتوي على bun.lock)
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      # 3. تثبيت الحزم وبناء مجلد dist
+      - name: Install dependencies & Build
+        run: |
+          bun install
+          bun run build
+
+      # 4. ضغط مجلد dist وتجهيزه للتحميل
+      - name: Upload dist folder as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
